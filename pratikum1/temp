@@ -1,1 +1,93 @@
+import numpy as np
+import matplotlib.pyplot as plt
 
+# ==========================================================
+# 1. RANCANGAN LOGIKA CRISP
+# ==========================================================
+# Batas kaku: tiket dianggap KRITIS jika waktu tunggu >= 8 jam
+#
+#             { 1,  x >= 8
+# chi(x)  =   {
+#             { 0,  x <  8
+def crisp_kritis(waktu, threshold=8.0):
+    """
+    Fungsi karakteristik crisp untuk kategori 'Kritis'.
+    Mengembalikan 1 jika waktu tunggu >= threshold, selain itu 0.
+    """
+    waktu = np.asarray(waktu, dtype=float)
+    return np.where(waktu >= threshold, 1.0, 0.0)
+
+
+# ==========================================================
+# 2. RANCANGAN LOGIKA FUZZY
+# ==========================================================
+# Interval transisi linear naik:
+#   x < 4        -> derajat kritis = 0
+#   4 <= x <= 12 -> derajat kritis naik linear dari 0 ke 1
+#   x > 12       -> derajat kritis = 1
+#
+# Turunan manual (persamaan garis lurus dari titik (4,0) ke (12,1)):
+#   slope m = (1 - 0) / (12 - 4) = 1/8
+#   mu(x) = m * (x - 4) = (x - 4) / 8
+#
+#             { 0,             x < 4
+# mu(x)   =   { (x - 4) / 8,   4 <= x <= 12
+#             { 1,             x > 12
+def fuzzy_kritis(waktu, a=4.0, b=12.0):
+    """
+    Fungsi keanggotaan fuzzy linear naik untuk kategori 'Kritis'.
+    - x <= a       : derajat 0
+    - a <= x <= b  : derajat (x - a) / (b - a)
+    - x >= b       : derajat 1
+    """
+    waktu = np.asarray(waktu, dtype=float)
+    derajat = (waktu - a) / (b - a)
+    return np.clip(derajat, 0.0, 1.0)
+
+
+# ==========================================================
+# 3. PENGUJIAN DENGAN DATA SOAL
+# ==========================================================
+test_values = [2, 4, 6, 7.9, 8.0, 8.1, 10, 12, 16, 24]
+
+print(f"{'Waktu (jam)':<12} | {'Crisp':<8} | {'Fuzzy mu(x)':<12} | Interpretasi Fuzzy")
+print("-" * 65)
+for val in test_values:
+    c_val = float(crisp_kritis(val))
+    f_val = float(fuzzy_kritis(val))
+    label_crisp = "KRITIS" if c_val == 1.0 else "Tidak Kritis"
+    interpretasi = f"Tingkat kekritisan {f_val * 100:.1f}%"
+    print(f"{val:<12} | {c_val:<8.1f} | {f_val:<12.3f} | {interpretasi} ({label_crisp} - crisp)")
+
+# ==========================================================
+# 4. GENERASI DATA SEMESTA PEMBICARAAN & VISUALISASI
+# ==========================================================
+waktu_range = np.linspace(0, 24, 500)
+y_crisp = crisp_kritis(waktu_range)
+y_fuzzy = fuzzy_kritis(waktu_range)
+
+plt.figure(figsize=(10, 5))
+
+plt.step(waktu_range, y_crisp, label='Crisp (Threshold = 8 jam)',
+         color='#d9534f', linewidth=2.5, where='post')
+
+plt.plot(waktu_range, y_fuzzy, label='Fuzzy (Linear Naik [4, 12] jam)',
+         color='#0275d8', linewidth=2.5)
+
+for tv in test_values:
+    plt.scatter(tv, crisp_kritis(tv), color='#d9534f', zorder=5, s=40)
+    plt.scatter(tv, fuzzy_kritis(tv), color='#0275d8', zorder=5, s=40)
+
+plt.axvline(x=8.0, color='gray', linestyle='--', alpha=0.6)
+
+plt.title('Perbandingan Logika Crisp vs Fuzzy: Kategori "Tiket Kritis"',
+          fontsize=13, fontweight='bold')
+plt.xlabel('Waktu Tunggu Penyelesaian Tiket (jam)', fontsize=11)
+plt.ylabel('Derajat Keanggotaan / Nilai Kebenaran', fontsize=11)
+plt.ylim(-0.05, 1.1)
+plt.grid(True, linestyle=':', alpha=0.6)
+plt.legend(loc='upper left', fontsize=10)
+plt.tight_layout()
+
+plt.savefig('visualisasi_tiket_helpdesk.png', dpi=300)
+print("\nGrafik disimpan sebagai 'visualisasi_tiket_helpdesk.png'")
